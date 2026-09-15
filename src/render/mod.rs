@@ -1,1 +1,3 @@
-//! Wgpu rendering pipeline, shaders, and surface texture integration
+pub mod state;
+
+pub use state::RenderState;

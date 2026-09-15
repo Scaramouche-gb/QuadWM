@@ -1,1 +1,3 @@
-//! Backend abstractions (Winit nested and DRM/KMS standalone)
+pub mod winit;
+
+pub use self::winit::App;

@@ -1,1 +1,3 @@
-//! Wayland compositor state machine & handlers (Smithay)
+pub mod state;
+
+pub use state::CompositorStateData;
