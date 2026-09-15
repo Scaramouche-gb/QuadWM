@@ -43,7 +43,9 @@ impl CompositorStateData {
         let xdg_shell_state = XdgShellState::new::<Self>(&display_handle);
         let shm_state = ShmState::new::<Self>(&display_handle, vec![]);
         let mut seat_state = SeatState::new();
-        let seat = seat_state.new_wl_seat(&display_handle, "seat-0");
+        let mut seat = seat_state.new_wl_seat(&display_handle, "seat-0");
+        let _ = seat.add_keyboard(Default::default(), 200, 25);
+        let _ = seat.add_pointer();
 
         // Initialize virtual output for clients to recognize display capabilities
         let output = Output::new(

@@ -141,8 +141,12 @@ impl WindowQuad {
         }
     }
 
+    pub fn model_matrix(&self) -> Mat4 {
+        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
+    }
+
     pub fn update_transform(&mut self, queue: &wgpu::Queue) {
-        let model_mat = Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position);
+        let model_mat = self.model_matrix();
         let model_uniform = ModelUniform {
             model: model_mat.to_cols_array_2d(),
         };
