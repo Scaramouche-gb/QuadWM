@@ -76,6 +76,18 @@ pub struct RenderState {
     pub index_buffer: wgpu::Buffer,
     pub sampler: wgpu::Sampler,
     pub model_bind_group_layout: wgpu::BindGroupLayout,
+
+    // Floor Grid
+    pub grid_pipeline: wgpu::RenderPipeline,
+    pub grid_vertex_buffer: wgpu::Buffer,
+    pub grid_vertex_count: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+struct GridVertex {
+    position: [f32; 3],
+    color: [f32; 3],
 }
 
 impl RenderState {
@@ -278,6 +290,92 @@ impl RenderState {
             ..Default::default()
         });
 
+        // 3D Floor Grid Pipeline
+        let grid_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Floor Grid Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/grid.wgsl").into()),
+        });
+
+        let grid_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Floor Grid Pipeline Layout"),
+            bind_group_layouts: &[&camera_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let grid_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Floor Grid Render Pipeline"),
+            layout: Some(&grid_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &grid_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<GridVertex>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            offset: 0,
+                            shader_location: 0,
+                            format: wgpu::VertexFormat::Float32x3,
+                        },
+                        wgpu::VertexAttribute {
+                            offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                            shader_location: 1,
+                            format: wgpu::VertexFormat::Float32x3,
+                        },
+                    ],
+                }],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &grid_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
+        // Generate lines for room floor (-10 to 10)
+        let mut grid_vertices: Vec<GridVertex> = Vec::new();
+        let grid_size = 10;
+        let y_floor = 0.0;
+        for i in -grid_size..=grid_size {
+            let color = if i == 0 { [0.0, 0.7, 0.9] } else { [0.2, 0.25, 0.35] };
+            // Z lines
+            grid_vertices.push(GridVertex { position: [i as f32, y_floor, -grid_size as f32], color });
+            grid_vertices.push(GridVertex { position: [i as f32, y_floor, grid_size as f32], color });
+            // X lines
+            grid_vertices.push(GridVertex { position: [-grid_size as f32, y_floor, i as f32], color });
+            grid_vertices.push(GridVertex { position: [grid_size as f32, y_floor, i as f32], color });
+        }
+
+        let grid_vertex_count = grid_vertices.len() as u32;
+        let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Grid Vertex Buffer"),
+            contents: bytemuck::cast_slice(&grid_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         Ok(Self {
             surface,
             device,
@@ -293,6 +391,9 @@ impl RenderState {
             index_buffer,
             sampler,
             model_bind_group_layout,
+            grid_pipeline,
+            grid_vertex_buffer,
+            grid_vertex_count,
         })
     }
 
@@ -354,6 +455,13 @@ impl RenderState {
                 timestamp_writes: None,
             });
 
+            // Draw floor grid
+            render_pass.set_pipeline(&self.grid_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+            render_pass.draw(0..self.grid_vertex_count, 0..1);
+
+            // Draw 3D window quads
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
