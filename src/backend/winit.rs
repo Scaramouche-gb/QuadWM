@@ -223,6 +223,12 @@ impl ApplicationHandler for App {
                 // Synchronize Wayland surface pixels into GPU textures
                 if let Some(render_state) = self.render_state.as_ref() {
                     for quad in &mut self.quads {
+                        quad.ensure_initialized(
+                            &render_state.device,
+                            &render_state.queue,
+                            &render_state.sampler,
+                            &render_state.model_bind_group_layout,
+                        );
                         quad.sync_surface_buffer(
                             &render_state.device,
                             &render_state.queue,

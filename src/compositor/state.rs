@@ -1,14 +1,17 @@
 use smithay::{
-    delegate_compositor, delegate_seat, delegate_shm, delegate_xdg_shell,
+    delegate_compositor, delegate_output, delegate_seat, delegate_shm, delegate_xdg_shell,
     input::{Seat, SeatHandler, SeatState},
+    output::{Mode, Output, PhysicalProperties, Subpixel},
     reexports::wayland_server::{
         backend::{ClientData, ClientId, DisconnectReason},
         protocol::wl_surface::WlSurface,
         Client, Display, DisplayHandle, Resource,
     },
+    utils::{Point, Size},
     wayland::{
         buffer::BufferHandler,
         compositor::{CompositorClientState, CompositorHandler, CompositorState},
+        output::OutputHandler,
         shell::xdg::{
             PositionerState, PopupSurface, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
@@ -27,6 +30,7 @@ pub struct CompositorStateData {
     pub shm_state: ShmState,
     pub seat_state: SeatState<Self>,
     pub seat: Seat<Self>,
+    pub output: Output,
     pub windows: Vec<WindowElement>,
     pub is_running: bool,
 }
@@ -41,6 +45,30 @@ impl CompositorStateData {
         let mut seat_state = SeatState::new();
         let seat = seat_state.new_wl_seat(&display_handle, "seat-0");
 
+        // Initialize virtual output for clients to recognize display capabilities
+        let output = Output::new(
+            "QuadWM-Virtual-1".to_string(),
+            PhysicalProperties {
+                size: Size::from((1920, 1080)),
+                subpixel: Subpixel::Unknown,
+                make: "QuadWM".to_string(),
+                model: "Spatial Display".to_string(),
+            },
+        );
+
+        let mode = Mode {
+            size: Size::from((1920, 1080)),
+            refresh: 60_000,
+        };
+        output.change_current_state(
+            Some(mode),
+            None,
+            None,
+            Some(Point::from((0, 0))),
+        );
+        output.set_preferred(mode);
+        output.create_global::<Self>(&display_handle);
+
         Self {
             display_handle,
             compositor_state,
@@ -48,6 +76,7 @@ impl CompositorStateData {
             shm_state,
             seat_state,
             seat,
+            output,
             windows: Vec::new(),
             is_running: true,
         }
@@ -86,7 +115,7 @@ impl CompositorHandler for CompositorStateData {
     }
 
     fn commit(&mut self, surface: &WlSurface) {
-        tracing::trace!(surface = ?surface.id(), "Surface committed");
+        tracing::info!(surface = ?surface.id(), "Wayland surface commit received");
     }
 }
 
@@ -97,7 +126,13 @@ impl XdgShellHandler for CompositorStateData {
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         tracing::info!(surface = ?surface.wl_surface().id(), "New XDG toplevel client connected");
+        
+        // Send configure with initial size hint 800x600 so clients know their layout
+        surface.with_pending_state(|state| {
+            state.size = Some((800, 600).into());
+        });
         surface.send_configure();
+        
         self.windows.push(WindowElement { toplevel: surface });
     }
 
@@ -136,8 +171,11 @@ impl SeatHandler for CompositorStateData {
     }
 }
 
+impl OutputHandler for CompositorStateData {}
+
 // Macro delegations for Smithay protocols
 delegate_compositor!(CompositorStateData);
 delegate_xdg_shell!(CompositorStateData);
 delegate_shm!(CompositorStateData);
 delegate_seat!(CompositorStateData);
+delegate_output!(CompositorStateData);
