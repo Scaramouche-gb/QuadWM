@@ -26,6 +26,7 @@ pub struct App {
     pub quads: Vec<WindowQuad>,
     pub input_manager: InputManager,
     pub is_cursor_grabbed: bool,
+    pub is_super_pressed: bool,
     pub start_time: Instant,
 }
 
@@ -41,7 +42,32 @@ impl App {
             quads: Vec::new(),
             input_manager: InputManager::new(),
             is_cursor_grabbed: false,
+            is_super_pressed: false,
             start_time: Instant::now(),
+        }
+    }
+
+    pub fn spawn_terminal(&self) {
+        if let Some(socket_name) = &self.socket_name {
+            let terminals = ["foot", "alacritty", "kitty", "weston-terminal", "xterm"];
+            let mut launched = false;
+
+            for term in terminals {
+                let res = std::process::Command::new(term)
+                    .env("WAYLAND_DISPLAY", socket_name)
+                    .spawn();
+
+                if let Ok(child) = res {
+                    tracing::info!("Spawned terminal '{}' with PID {}", term, child.id());
+                    println!("==> Successfully spawned terminal '{}' inside 3D space!", term);
+                    launched = true;
+                    break;
+                }
+            }
+
+            if !launched {
+                tracing::error!("Could not find any terminal emulator to spawn (tried foot, alacritty, kitty)");
+            }
         }
     }
 
@@ -176,9 +202,10 @@ impl ApplicationHandler for App {
         println!(" Run clients in another terminal:");
         println!("   WAYLAND_DISPLAY={} foot (or alacritty / kitty)", socket_name);
         println!(" Navigation & Interaction:");
+        println!("   - Press Win + N to spawn a new 3D terminal immediately!");
         println!("   - Click inside window to grab mouse (Crosshair targeting)");
         println!("   - Point the crosshair at a 3D window to aim");
-        println!("   - Left Click while aiming: send click to Wayland app");
+        println!("   - Left Click while aiming: focus and send click to Wayland app");
         println!("   - Type keys while aiming: forward input to Wayland app");
         println!("   - Press ESC to release mouse cursor");
         println!("   - WASD to fly, Space / Shift for Up / Down");
@@ -304,6 +331,16 @@ impl ApplicationHandler for App {
                 ..
             } => {
                 let is_pressed = state == ElementState::Pressed;
+
+                if key_code == KeyCode::SuperLeft || key_code == KeyCode::SuperRight {
+                    self.is_super_pressed = is_pressed;
+                }
+
+                // Win + N shortcut to spawn terminal inside 3D space
+                if is_pressed && key_code == KeyCode::KeyN && self.is_super_pressed {
+                    self.spawn_terminal();
+                    return;
+                }
 
                 if is_pressed && key_code == KeyCode::Escape {
                     self.set_cursor_grab(false);
