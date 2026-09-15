@@ -1,4 +1,5 @@
 use smithay::{
+    backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_data_device, delegate_output, delegate_seat, delegate_shm,
     delegate_xdg_shell,
     input::{Seat, SeatHandler, SeatState},
@@ -127,7 +128,8 @@ impl CompositorHandler for CompositorStateData {
     }
 
     fn commit(&mut self, surface: &WlSurface) {
-        tracing::info!(surface = ?surface.id(), "Wayland surface commit received");
+        on_commit_buffer_handler::<Self>(surface);
+        tracing::info!(surface = ?surface.id(), "Wayland surface commit received and buffer updated");
     }
 }
 

@@ -107,9 +107,12 @@ impl InputManager {
                 smithay::backend::input::KeyState::Released
             };
 
+            // Wayland keycodes are evdev scancodes + 8 (XKB convention)
+            let wayland_keycode = key_code + 8;
+
             keyboard.input::<(), _>(
                 state,
-                key_code.into(),
+                wayland_keycode.into(),
                 key_state,
                 serial,
                 time,
