@@ -1,0 +1,28 @@
+[package]
+name = "quadwm"
+version = "0.1.0"
+edition = "2024"
+authors = ["QuadWM Contributors"]
+description = "A 3D spatial Wayland compositor for Arch Linux"
+
+[dependencies]
+# Smithay Wayland compositor building blocks
+smithay = { version = "0.7", features = ["backend_winit", "backend_drm", "backend_libinput", "renderer_gl", "wayland_frontend"] }
+
+# Event loop & Wayland server protocol primitives
+calloop = "0.14"
+wayland-server = "0.31"
+
+# Graphics & Math
+wgpu = "24"
+glam = { version = "0.29", features = ["bytemuck"] }
+bytemuck = { version = "1.21", features = ["derive"] }
+
+# Nested backend & windowing
+winit = "0.30"
+
+# Utilities & Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2"
+anyhow = "1"
