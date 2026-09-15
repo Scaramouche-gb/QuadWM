@@ -149,7 +149,7 @@ impl App {
                 while compositor_state.windows.len() > self.quads.len() {
                     let idx = self.quads.len();
                     let window_elem = &compositor_state.windows[idx];
-                    let offset_x = (idx as f32) * 2.5 - 1.0;
+                    let offset_x = (idx as f32) * 2.5;
                     let position = Vec3::new(offset_x, 1.0, 0.0);
 
                     let quad = WindowQuad::new(
@@ -158,7 +158,7 @@ impl App {
                         &render_state.device,
                     );
                     self.quads.push(quad);
-                    tracing::info!(index = idx, "Added new 3D WindowQuad to virtual space");
+                    tracing::info!(index = idx, ?position, "Added new 3D WindowQuad to virtual space");
                 }
             }
         }

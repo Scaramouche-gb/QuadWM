@@ -27,8 +27,12 @@ impl WindowQuad {
         position: Vec3,
         device: &wgpu::Device,
     ) -> Self {
+        let scale = Vec3::new(2.0, 1.5, 1.0);
+        let rotation = Quat::IDENTITY;
+        let model_mat = Mat4::from_scale_rotation_translation(scale, rotation, position);
+
         let model_uniform = ModelUniform {
-            model: Mat4::IDENTITY.to_cols_array_2d(),
+            model: model_mat.to_cols_array_2d(),
         };
 
         let model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -40,8 +44,8 @@ impl WindowQuad {
         Self {
             toplevel,
             position,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::new(2.0, 1.5, 1.0),
+            rotation,
+            scale,
             texture: None,
             texture_view: None,
             model_buffer,

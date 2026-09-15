@@ -1,5 +1,6 @@
 use smithay::{
-    delegate_compositor, delegate_output, delegate_seat, delegate_shm, delegate_xdg_shell,
+    delegate_compositor, delegate_data_device, delegate_output, delegate_seat, delegate_shm,
+    delegate_xdg_shell,
     input::{Seat, SeatHandler, SeatState},
     output::{Mode, Output, PhysicalProperties, Subpixel},
     reexports::wayland_server::{
@@ -12,6 +13,12 @@ use smithay::{
         buffer::BufferHandler,
         compositor::{CompositorClientState, CompositorHandler, CompositorState},
         output::OutputHandler,
+        selection::{
+            data_device::{
+                ClientDndGrabHandler, DataDeviceHandler, DataDeviceState, ServerDndGrabHandler,
+            },
+            SelectionHandler,
+        },
         shell::xdg::{
             PositionerState, PopupSurface, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
@@ -28,6 +35,7 @@ pub struct CompositorStateData {
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
     pub shm_state: ShmState,
+    pub data_device_state: DataDeviceState,
     pub seat_state: SeatState<Self>,
     pub seat: Seat<Self>,
     pub output: Output,
@@ -42,6 +50,7 @@ impl CompositorStateData {
         let compositor_state = CompositorState::new::<Self>(&display_handle);
         let xdg_shell_state = XdgShellState::new::<Self>(&display_handle);
         let shm_state = ShmState::new::<Self>(&display_handle, vec![]);
+        let data_device_state = DataDeviceState::new::<Self>(&display_handle);
         let mut seat_state = SeatState::new();
         let mut seat = seat_state.new_wl_seat(&display_handle, "seat-0");
         let _ = seat.add_keyboard(Default::default(), 200, 25);
@@ -76,6 +85,7 @@ impl CompositorStateData {
             compositor_state,
             xdg_shell_state,
             shm_state,
+            data_device_state,
             seat_state,
             seat,
             output,
@@ -175,9 +185,23 @@ impl SeatHandler for CompositorStateData {
 
 impl OutputHandler for CompositorStateData {}
 
+impl DataDeviceHandler for CompositorStateData {
+    fn data_device_state(&self) -> &DataDeviceState {
+        &self.data_device_state
+    }
+}
+
+impl SelectionHandler for CompositorStateData {
+    type SelectionUserData = ();
+}
+
+impl ClientDndGrabHandler for CompositorStateData {}
+impl ServerDndGrabHandler for CompositorStateData {}
+
 // Macro delegations for Smithay protocols
 delegate_compositor!(CompositorStateData);
 delegate_xdg_shell!(CompositorStateData);
 delegate_shm!(CompositorStateData);
 delegate_seat!(CompositorStateData);
 delegate_output!(CompositorStateData);
+delegate_data_device!(CompositorStateData);
