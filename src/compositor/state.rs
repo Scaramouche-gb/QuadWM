@@ -1,13 +1,16 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_data_device, delegate_output, delegate_seat, delegate_shm,
-    delegate_xdg_shell,
+    delegate_xdg_decoration, delegate_xdg_shell,
     input::{Seat, SeatHandler, SeatState},
     output::{Mode, Output, PhysicalProperties, Subpixel},
-    reexports::wayland_server::{
-        backend::{ClientData, ClientId, DisconnectReason},
-        protocol::wl_surface::WlSurface,
-        Client, Display, DisplayHandle, Resource,
+    reexports::{
+        wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode,
+        wayland_server::{
+            backend::{ClientData, ClientId, DisconnectReason},
+            protocol::wl_surface::WlSurface,
+            Client, Display, DisplayHandle, Resource,
+        },
     },
     utils::{Point, Size},
     wayland::{
@@ -21,6 +24,7 @@ use smithay::{
             SelectionHandler,
         },
         shell::xdg::{
+            decoration::{XdgDecorationHandler, XdgDecorationState},
             PositionerState, PopupSurface, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
         shm::{ShmHandler, ShmState},
@@ -35,6 +39,7 @@ pub struct CompositorStateData {
     pub display_handle: DisplayHandle,
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
+    pub xdg_decoration_state: XdgDecorationState,
     pub shm_state: ShmState,
     pub data_device_state: DataDeviceState,
     pub seat_state: SeatState<Self>,
@@ -50,6 +55,7 @@ impl CompositorStateData {
 
         let compositor_state = CompositorState::new::<Self>(&display_handle);
         let xdg_shell_state = XdgShellState::new::<Self>(&display_handle);
+        let xdg_decoration_state = XdgDecorationState::new::<Self>(&display_handle);
         let shm_state = ShmState::new::<Self>(&display_handle, vec![]);
         let data_device_state = DataDeviceState::new::<Self>(&display_handle);
         let mut seat_state = SeatState::new();
@@ -85,6 +91,7 @@ impl CompositorStateData {
             display_handle,
             compositor_state,
             xdg_shell_state,
+            xdg_decoration_state,
             shm_state,
             data_device_state,
             seat_state,
@@ -200,9 +207,34 @@ impl SelectionHandler for CompositorStateData {
 impl ClientDndGrabHandler for CompositorStateData {}
 impl ServerDndGrabHandler for CompositorStateData {}
 
+impl XdgDecorationHandler for CompositorStateData {
+    fn new_decoration(&mut self, toplevel: ToplevelSurface) {
+        toplevel.with_pending_state(|state| {
+            // Advise client-side decorations so client renders full window contents cleanly
+            state.decoration_mode = Some(DecorationMode::ClientSide);
+        });
+        toplevel.send_configure();
+    }
+
+    fn request_mode(&mut self, toplevel: ToplevelSurface, mode: DecorationMode) {
+        toplevel.with_pending_state(|state| {
+            state.decoration_mode = Some(mode);
+        });
+        toplevel.send_configure();
+    }
+
+    fn unset_mode(&mut self, toplevel: ToplevelSurface) {
+        toplevel.with_pending_state(|state| {
+            state.decoration_mode = Some(DecorationMode::ClientSide);
+        });
+        toplevel.send_configure();
+    }
+}
+
 // Macro delegations for Smithay protocols
 delegate_compositor!(CompositorStateData);
 delegate_xdg_shell!(CompositorStateData);
+delegate_xdg_decoration!(CompositorStateData);
 delegate_shm!(CompositorStateData);
 delegate_seat!(CompositorStateData);
 delegate_output!(CompositorStateData);
